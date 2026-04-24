@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SpendSmart — Reports</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<aside class="sidebar" id="sidebar"></aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title">Reports</div>
+    <div style="display:flex;gap:9px;align-items:center;">
+      <button class="btn btn-secondary btn-sm" onclick="downloadCSV(getExpenses())">📤 Export CSV</button>
+      <button class="theme-btn" id="themeBtn" onclick="toggleTheme()"></button>
+    </div>
+  </div>
+
+  <div class="page-content">
+
+    <div class="stats-row" style="margin-bottom:18px;">
+      <div class="stat-card blue"><div class="stat-icon">💳</div><div class="stat-label">Total Spent</div><div class="stat-value" id="rTotal">₹0</div></div>
+      <div class="stat-card green"><div class="stat-icon">📅</div><div class="stat-label">This Month</div><div class="stat-value" id="rMonth">₹0</div></div>
+      <div class="stat-card orange"><div class="stat-icon">📊</div><div class="stat-label">Avg Per Entry</div><div class="stat-value" id="rAvg">₹0</div></div>
+      <div class="stat-card red"><div class="stat-icon">🔢</div><div class="stat-label">Total Entries</div><div class="stat-value" id="rCount">0</div></div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom:16px;">
+
+      <!-- MONTHLY BREAKDOWN -->
+      <div class="card" style="overflow-y:auto;max-height:400px;">
+        <div class="card-title">📅 Monthly Breakdown</div>
+        <div id="monthlyReport"><p class="empty-msg">No data yet.</p></div>
+      </div>
+
+      <!-- CATEGORY TOTALS -->
+      <div class="card">
+        <div class="card-title">🗂️ Category Totals</div>
+        <div id="catReport"><p class="empty-msg">No data yet.</p></div>
+      </div>
+
+    </div>
+
+    <!-- FULL LOG -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;flex-wrap:wrap;gap:9px;">
+        <div class="card-title" style="margin:0;">📋 Full Expense Log</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input type="month" id="filterMonth" style="padding:7px 10px;font-size:12px;" onchange="renderLog()"/>
+          <select id="filterCatR" onchange="renderLog()" style="font-size:12px;">
+            <option value="">All Categories</option>
+            <option>Food</option><option>Travel</option><option>Shopping</option>
+            <option>Bills</option><option>Health</option><option>Entertainment</option>
+            <option>Education</option><option>Other</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Clear</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportFiltered()">📤 Export</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="exp-table">
+          <thead><tr><th>#</th><th>Category</th><th>Name</th><th>Amount</th><th>Date</th></tr></thead>
+          <tbody id="logBody"></tbody>
+        </table>
+        <p class="empty-msg" id="logEmpty" style="display:none;">No expenses match filters.</p>
+      </div>
+      <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:9px;">
+        <span style="font-size:12px;color:var(--text3);" id="logSummary"></span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script>
+  window.onload = checkAuth;
+  applyStoredTheme();
+  document.getElementById("sidebar").innerHTML = buildSidebar("Reports");
+
+  // Set default month filter to current month
+  var now = new Date();
+  document.getElementById("filterMonth").value = now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+
+  renderAll();
+
+  function renderAll() {
+    var exp = getExpenses();
+    renderSummary(exp);
+    renderMonthly(exp);
+    renderCatReport(exp);
+    renderLog();
+  }
+
+  function renderSummary(exp) {
+    var total = exp.reduce(function(s,e){ return s+e.amount; },0);
+    var avg   = exp.length ? total/exp.length : 0;
+    document.getElementById("rTotal").textContent = fmtMoney(total);
+    document.getElementById("rMonth").textContent = fmtMoney(monthTotal(exp));
+    document.getElementById("rCount").textContent = exp.length;
+    document.getElementById("rAvg").textContent   = fmtMoney(Math.round(avg));
+  }
+
+  function renderMonthly(exp) {
+    var el = document.getElementById("monthlyReport");
+    var byMonth = {};
+    exp.forEach(function(e){
+      var d=new Date(e.date+"T00:00:00");
+      var k=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+      if (!byMonth[k]) byMonth[k]={total:0,cats:{},count:0};
+      byMonth[k].total+=e.amount; byMonth[k].count++;
+      byMonth[k].cats[e.category]=(byMonth[k].cats[e.category]||0)+e.amount;
+    });
+    var keys=Object.keys(byMonth).sort().reverse();
+    if (!keys.length) { el.innerHTML='<p class="empty-msg">No data yet.</p>'; return; }
+    el.innerHTML=keys.map(function(k){
+      var parts=k.split("-");
+      var label=new Date(parts[0],parts[1]-1).toLocaleString("default",{month:"long",year:"numeric"});
+      var d=byMonth[k];
+      var cats=Object.entries(d.cats).sort(function(a,b){ return b[1]-a[1]; });
+      return '<div class="report-month"><h3>📅 '+label+' <span style="font-size:11px;color:var(--text3);font-weight:400;">('+d.count+' entries)</span></h3>'+
+        cats.map(function(p){ return '<div class="report-row"><span>'+catIcon(p[0])+" "+p[0]+'</span><span>'+fmtMoney(p[1])+'</span></div>'; }).join("")+
+        '<div class="report-row"><span>Total</span><span>'+fmtMoney(d.total)+'</span></div></div>';
+    }).join("");
+  }
+
+  function renderCatReport(exp) {
+    var el=document.getElementById("catReport");
+    var totals={},counts={};
+    var grand=exp.reduce(function(s,e){ return s+e.amount; },0);
+    exp.forEach(function(e){ totals[e.category]=(totals[e.category]||0)+e.amount; counts[e.category]=(counts[e.category]||0)+1; });
+    var sorted=Object.entries(totals).sort(function(a,b){ return b[1]-a[1]; });
+    if (!sorted.length) { el.innerHTML='<p class="empty-msg">No data yet.</p>'; return; }
+    el.innerHTML='<div style="display:flex;flex-direction:column;gap:12px;">'+sorted.map(function(pair){
+      var cat=pair[0],amt=pair[1];
+      var pct=grand?(amt/grand*100).toFixed(1):0;
+      return '<div style="display:flex;align-items:center;gap:11px;">'+
+        '<div style="font-size:22px;width:32px;text-align:center;">'+catIcon(cat)+'</div>'+
+        '<div style="flex:1;">'+
+          '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:4px;"><span>'+cat+'</span><span style="color:var(--accent);">'+fmtMoney(amt)+'</span></div>'+
+          '<div style="display:flex;align-items:center;gap:7px;"><div style="flex:1;height:6px;background:var(--bg2);border-radius:99px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px;"></div></div>'+
+          '<span style="font-size:11px;color:var(--text3);min-width:36px;">'+pct+'%</span></div>'+
+          '<span style="font-size:11px;color:var(--text3);">'+counts[cat]+' entries</span>'+
+        '</div></div>';
+    }).join("")+'</div>';
+  }
+
+  function renderLog() {
+    var mf=document.getElementById("filterMonth").value;
+    var cf=document.getElementById("filterCatR").value;
+    var list=getExpenses();
+    if (mf) { var p=mf.split("-"); list=list.filter(function(e){ var d=new Date(e.date+"T00:00:00"); return d.getFullYear()===+p[0]&&d.getMonth()===+p[1]-1; }); }
+    if (cf) list=list.filter(function(e){ return e.category===cf; });
+    list.sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
+    var tbody=document.getElementById("logBody"), empty=document.getElementById("logEmpty"), sum=document.getElementById("logSummary");
+    if (!list.length) { tbody.innerHTML=""; empty.style.display="block"; sum.textContent=""; return; }
+    empty.style.display="none";
+    var sub=list.reduce(function(s,e){ return s+e.amount; },0);
+    sum.textContent=list.length+" entries · Total: "+fmtMoney(sub);
+    tbody.innerHTML=list.map(function(e,i){
+      var hi=e.amount>=2000;
+      return '<tr class="'+(hi?"hi-row":"")+'" style="animation-delay:'+i*18+'ms">'+
+        '<td style="color:var(--text3);font-size:12px;">'+(i+1)+'</td>'+
+        '<td><span class="cat-chip">'+catIcon(e.category)+" "+e.category+'</span></td>'+
+        '<td>'+escHtml(e.name)+'</td>'+
+        '<td class="amt-cell '+(hi?"hi":"")+'">'+fmtMoney(e.amount)+'</td>'+
+        '<td>'+fmtDate(e.date)+'</td></tr>';
+    }).join("");
+  }
+
+  function clearFilters() {
+    document.getElementById("filterMonth").value="";
+    document.getElementById("filterCatR").value="";
+    renderLog();
+  }
+
+  function exportFiltered() {
+    var mf=document.getElementById("filterMonth").value;
+    var cf=document.getElementById("filterCatR").value;
+    var list=getExpenses();
+    if (mf) { var p=mf.split("-"); list=list.filter(function(e){ var d=new Date(e.date+"T00:00:00"); return d.getFullYear()===+p[0]&&d.getMonth()===+p[1]-1; }); }
+    if (cf) list=list.filter(function(e){ return e.category===cf; });
+    if (!list.length) { showToast("No data to export.","warning"); return; }
+    downloadCSV(list);
+    showToast("📤 Exported "+list.length+" entries.");
+  }
+</script>
+</body>
+</html>

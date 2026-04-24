@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SpendSmart — Charts</title>
+  <link rel="stylesheet" href="style.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<aside class="sidebar" id="sidebar"></aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title">Charts</div>
+    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()"></button>
+  </div>
+
+  <div class="page-content">
+
+    <!-- STATS -->
+    <div class="stats-row" style="margin-bottom:18px;">
+      <div class="stat-card blue"><div class="stat-icon">💳</div><div class="stat-label">Total Spent</div><div class="stat-value" id="cTotal">₹0</div></div>
+      <div class="stat-card green"><div class="stat-icon">📅</div><div class="stat-label">This Month</div><div class="stat-value" id="cMonth">₹0</div></div>
+      <div class="stat-card orange"><div class="stat-icon">🏆</div><div class="stat-label">Top Category</div><div class="stat-value" id="cTop" style="font-size:15px;">—</div></div>
+      <div class="stat-card red"><div class="stat-icon">🔢</div><div class="stat-label">Entries</div><div class="stat-value" id="cCount">0</div></div>
+    </div>
+
+    <div class="charts-grid" style="margin-bottom:16px;">
+      <div class="card"><div class="card-title">🥧 Spending by Category</div><canvas id="pieChart"></canvas><p class="empty-msg" id="pieEmpty" style="display:none;">No data yet.</p></div>
+      <div class="card"><div class="card-title">📊 Monthly Trend (Last 6 Months)</div><canvas id="barChart"></canvas><p class="empty-msg" id="barEmpty" style="display:none;">No data yet.</p></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📋 Category Breakdown</div>
+      <div class="table-wrap">
+        <table class="exp-table"><thead><tr><th>Category</th><th>Total</th><th>Entries</th><th>% of Total</th></tr></thead><tbody id="catBody"></tbody></table>
+        <p class="empty-msg" id="catEmpty" style="display:none;">No expenses yet.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script>
+  window.onload = checkAuth;
+  applyStoredTheme();
+  document.getElementById("sidebar").innerHTML = buildSidebar("Charts");
+
+  var PALETTE = ["#3a5bd9","#6344e0","#10b981","#f59e0b","#ef4444","#00d4aa","#f5c842","#64748b"];
+  var pieInst = null, barInst = null;
+
+  renderCharts();
+
+  function renderCharts() {
+    var exp  = getExpenses();
+    var dark = document.body.classList.contains("dark");
+    var tc   = dark ? "#8a92c8" : "#4a5180";
+    var gc   = dark ? "rgba(255,255,255,.07)" : "rgba(0,0,0,.07)";
+    var bg   = dark ? "#181b2e" : "#ffffff";
+
+    var total = exp.reduce(function(s,e){ return s+e.amount; },0);
+    document.getElementById("cTotal").textContent = fmtMoney(total);
+    document.getElementById("cMonth").textContent = fmtMoney(monthTotal(exp));
+    document.getElementById("cCount").textContent = exp.length;
+    var top = topCategory(exp);
+    document.getElementById("cTop").textContent   = top ? catIcon(top[0])+" "+top[0] : "—";
+
+    buildPie(exp, dark, tc, bg);
+    buildBar(exp, dark, gc, tc);
+    buildCatTable(exp, total);
+  }
+
+  function buildPie(exp, dark, tc, bg) {
+    var totals = {};
+    exp.forEach(function(e){ totals[e.category]=(totals[e.category]||0)+e.amount; });
+    var labels = Object.keys(totals), data = Object.values(totals);
+    var cv = document.getElementById("pieChart"), em = document.getElementById("pieEmpty");
+    if (!labels.length) { cv.style.display="none"; em.style.display="block"; return; }
+    cv.style.display=""; em.style.display="none";
+    if (pieInst) { pieInst.destroy(); pieInst=null; }
+    pieInst = new Chart(cv.getContext("2d"), {
+      type:"doughnut",
+      data:{ labels:labels.map(function(l){ return catIcon(l)+" "+l; }), datasets:[{data:data,backgroundColor:PALETTE.slice(0,labels.length),borderWidth:3,borderColor:bg,hoverBorderWidth:4}] },
+      options:{ responsive:true,cutout:"60%",plugins:{ legend:{position:"bottom",labels:{color:tc,font:{size:11}}}, tooltip:{callbacks:{label:function(c){ return " "+fmtMoney(c.parsed); }}} }, animation:{duration:700} }
+    });
+  }
+
+  function buildBar(exp, dark, gc, tc) {
+    var monthData={}, now=new Date();
+    for (var i=5;i>=0;i--) { var d=new Date(now.getFullYear(),now.getMonth()-i,1); var k=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); monthData[k]=0; }
+    exp.forEach(function(e){ var d=new Date(e.date+"T00:00:00"); var k=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); if(k in monthData) monthData[k]+=e.amount; });
+    var labels=Object.keys(monthData).map(function(k){ var p=k.split("-"); return new Date(p[0],p[1]-1).toLocaleString("default",{month:"short",year:"2-digit"}); });
+    var data=Object.values(monthData);
+    var cv=document.getElementById("barChart"), em=document.getElementById("barEmpty");
+    if (!exp.length) { cv.style.display="none"; em.style.display="block"; return; }
+    cv.style.display=""; em.style.display="none";
+    if (barInst) { barInst.destroy(); barInst=null; }
+    barInst = new Chart(cv.getContext("2d"), {
+      type:"bar",
+      data:{ labels:labels, datasets:[{label:"Monthly Spending",data:data,backgroundColor:"rgba(58,91,217,.75)",borderColor:"#3a5bd9",borderWidth:2,borderRadius:8}] },
+      options:{ responsive:true,scales:{ x:{grid:{color:gc},ticks:{color:tc}}, y:{grid:{color:gc},ticks:{color:tc,callback:function(v){ return fmtMoney(v); }}} }, plugins:{ legend:{labels:{color:tc}}, tooltip:{callbacks:{label:function(c){ return " "+fmtMoney(c.parsed.y); }}} }, animation:{duration:700} }
+    });
+  }
+
+  function buildCatTable(exp, total) {
+    var totals={}, counts={};
+    exp.forEach(function(e){ totals[e.category]=(totals[e.category]||0)+e.amount; counts[e.category]=(counts[e.category]||0)+1; });
+    var sorted=Object.entries(totals).sort(function(a,b){ return b[1]-a[1]; });
+    var tbody=document.getElementById("catBody"), empty=document.getElementById("catEmpty");
+    if (!sorted.length) { tbody.innerHTML=""; empty.style.display="block"; return; }
+    empty.style.display="none";
+    tbody.innerHTML=sorted.map(function(pair){
+      var cat=pair[0], amt=pair[1];
+      var pct=total?(amt/total*100).toFixed(1):0;
+      return '<tr><td><span class="cat-chip">'+catIcon(cat)+" "+cat+'</span></td>'+
+        '<td class="amt-cell">'+fmtMoney(amt)+'</td><td>'+counts[cat]+'</td>'+
+        '<td><div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;height:6px;background:var(--bg2);border-radius:99px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:var(--accent);border-radius:99px;"></div></div><span style="font-size:11px;color:var(--text3);min-width:34px;">'+pct+'%</span></div></td></tr>';
+    }).join("");
+  }
+</script>
+</body>
+</html>

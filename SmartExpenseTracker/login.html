@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SpendSmart — Login</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<div class="login-page">
+  <div class="login-blob blob1"></div>
+  <div class="login-blob blob2"></div>
+
+  <div class="login-card">
+    <div class="login-logo">💰</div>
+    <h1 class="login-title">SpendSmart</h1>
+    <p class="login-sub">Your personal finance dashboard</p>
+
+    <div class="login-error" id="loginError"></div>
+
+    <div class="login-form">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="username" placeholder="Enter your username" autocomplete="username"/>
+      </div>
+
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password"/>
+        <!-- Password hint shown below the field -->
+        <div class="password-hint">
+          <strong>Password must:</strong>
+          <ul>
+            <li>Be at least <strong>6 characters</strong> long</li>
+            <li>Contain at least <strong>one letter</strong> (a–z or A–Z)</li>
+            <li>Contain at least <strong>one number</strong> (0–9)</li>
+          </ul>
+          <span style="font-size:11px;color:var(--text3);">Example: <strong>pass12</strong> or <strong>myPass9</strong></span>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="loginUser()" style="width:100%;margin-top:2px;">
+        Sign In →
+      </button>
+    </div>
+
+    <div class="login-footer">
+      <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" style="margin:auto;display:block;"></button>
+    </div>
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script>
+  // Redirect if already logged in
+  if (localStorage.getItem("currentUser")) window.location.href = "index.html";
+  applyStoredTheme();
+
+  // Allow Enter key to submit
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") loginUser();
+  });
+</script>
+</body>
+</html>

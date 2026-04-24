@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SpendSmart — Dashboard</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar"></aside>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title">Dashboard</div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <button class="theme-btn" id="themeBtn" onclick="toggleTheme()"></button>
+    </div>
+  </div>
+
+  <div class="page-content">
+
+    <!-- STAT CARDS -->
+    <div class="stats-row">
+      <div class="stat-card blue">
+        <div class="stat-icon">💳</div>
+        <div class="stat-label">Total Spent</div>
+        <div class="stat-value" id="statTotal">₹0</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-icon">📅</div>
+        <div class="stat-label">This Month</div>
+        <div class="stat-value" id="statMonth">₹0</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-icon">🏆</div>
+        <div class="stat-label">Top Category</div>
+        <div class="stat-value" id="statTop" style="font-size:15px;">—</div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-icon">🔢</div>
+        <div class="stat-label">Entries</div>
+        <div class="stat-value" id="statCount">0</div>
+      </div>
+    </div>
+
+    <!-- ROW: Form + Sidebar panels -->
+    <div class="grid-2" style="margin-bottom:16px;">
+
+      <!-- ADD EXPENSE FORM -->
+      <div class="card">
+        <div class="card-title" id="formTitle">➕ Add Expense</div>
+        <input type="hidden" id="editId"/>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Name</label>
+            <input type="text" id="expName" placeholder="e.g. Lunch"/>
+          </div>
+          <div class="form-group">
+            <label>Amount (₹)</label>
+            <input type="number" id="expAmt" placeholder="0" min="0"/>
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <select id="expCat">
+              <option>Food</option><option>Travel</option><option>Shopping</option>
+              <option>Bills</option><option>Health</option><option>Entertainment</option>
+              <option>Education</option><option>Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="expDate"/>
+          </div>
+        </div>
+        <div style="display:flex;gap:9px;margin-top:13px;">
+          <button class="btn btn-primary" onclick="saveExpense()">💾 Save</button>
+          <button class="btn btn-secondary" id="cancelBtn" onclick="cancelEdit()" style="display:none;">✖ Cancel</button>
+        </div>
+
+        <!-- CSV IMPORT -->
+        <div style="margin-top:18px;">
+          <div class="card-title">📥 Import CSV</div>
+          <div class="csv-zone" onclick="document.getElementById('csvFile').click()">
+            <div style="font-size:26px;">📂</div>
+            <p>Click to upload CSV<br/><span style="font-size:11px;">Format: Name, Amount, Category, Date (YYYY-MM-DD)</span></p>
+          </div>
+          <input type="file" id="csvFile" accept=".csv" style="display:none;" onchange="handleCSV(event)"/>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div class="col-stack">
+
+        <!-- BUDGET -->
+        <div class="card">
+          <div class="card-title">🎯 Budget Tracker</div>
+          <div style="display:flex;gap:9px;margin-bottom:10px;">
+            <input type="number" id="budgetInput" placeholder="Set monthly budget (₹)" min="0" style="flex:1;"/>
+            <button class="btn btn-secondary btn-sm" onclick="setBudget()">Set</button>
+          </div>
+          <div id="budgetPanel" style="display:none;">
+            <div class="budget-meta">
+              <span id="budgetSpent">Spent: ₹0</span>
+              <span id="budgetMax">Budget: ₹0</span>
+            </div>
+            <div class="budget-track">
+              <div class="budget-fill" id="budgetFill" style="width:0%;"></div>
+            </div>
+            <p id="budgetStatus" style="font-size:12px;color:var(--text3);"></p>
+          </div>
+        </div>
+
+        <!-- RECENT TRANSACTIONS -->
+        <div class="card">
+          <div class="card-title">🕐 Recent Transactions</div>
+          <div id="recentList"><p class="empty-msg">No transactions yet.</p></div>
+        </div>
+
+        <!-- INSIGHTS -->
+        <div class="card">
+          <div class="card-title">💡 Insights</div>
+          <div id="insightsList"><p class="empty-msg">Add expenses to see insights.</p></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- EXPENSE TABLE -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;flex-wrap:wrap;gap:9px;">
+        <div class="card-title" style="margin:0;">📋 All Expenses</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-secondary btn-sm" onclick="downloadCSV(getExpenses())">📤 Export CSV</button>
+          <button class="btn btn-danger btn-sm" onclick="clearAll()">🗑️ Clear All</button>
+        </div>
+      </div>
+
+      <!-- TOOLBAR -->
+      <div class="toolbar">
+        <input type="text" id="search" placeholder="🔍 Search…" oninput="renderTable()"/>
+        <select id="filterCat" onchange="renderTable()">
+          <option value="">All Categories</option>
+          <option>Food</option><option>Travel</option><option>Shopping</option>
+          <option>Bills</option><option>Health</option><option>Entertainment</option>
+          <option>Education</option><option>Other</option>
+        </select>
+        <select id="sortSel" onchange="renderTable()">
+          <option value="newest">🕐 Newest</option>
+          <option value="oldest">🕑 Oldest</option>
+          <option value="high">💰 High→Low</option>
+          <option value="low">💵 Low→High</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table class="exp-table">
+          <thead><tr>
+            <th>Category</th><th>Name</th><th>Amount</th>
+            <th>Date</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="expBody"></tbody>
+        </table>
+        <p class="empty-msg" id="emptyMsg" style="display:none;">No expenses found.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="confirm-overlay" id="confirmModal">
+  <div class="confirm-box">
+    <div class="confirm-icon">⚠️</div>
+    <h3 id="confirmTitle">Confirm</h3>
+    <p id="confirmMsg">Are you sure?</p>
+    <div class="confirm-actions">
+      <button class="btn btn-danger" onclick="doConfirm()" id="confirmYesBtn">Delete</button>
+      <button class="btn btn-secondary" onclick="closeConfirmModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script>
+  // ── AUTH GUARD ────────────────────────────────
+  window.onload = checkAuth;
+
+  // ── INIT ──────────────────────────────────────
+  applyStoredTheme();
+  document.getElementById("sidebar").innerHTML = buildSidebar("Dashboard");
+  document.getElementById("expDate").valueAsDate = new Date();
+
+  var budget = getBudget();
+  if (budget > 0) {
+    document.getElementById("budgetInput").value = budget;
+    document.getElementById("budgetPanel").style.display = "block";
+  }
+
+  renderAll();
+
+  // ── RENDER ALL ────────────────────────────────
+  function renderAll() {
+    var exp = getExpenses();
+    renderStats(exp);
+    renderBudget(exp);
+    renderRecent(exp);
+    renderInsights(exp);
+    renderTable();
+  }
+
+  // ── STATS ─────────────────────────────────────
+  function renderStats(exp) {
+    var total = exp.reduce(function(s,e){ return s+e.amount; }, 0);
+    document.getElementById("statTotal").textContent = fmtMoney(total);
+    document.getElementById("statCount").textContent = exp.length;
+    document.getElementById("statMonth").textContent = fmtMoney(monthTotal(exp));
+    var top = topCategory(exp);
+    document.getElementById("statTop").textContent = top ? catIcon(top[0])+" "+top[0] : "—";
+  }
+
+  // ── BUDGET ────────────────────────────────────
+  function setBudget() {
+    var val = parseFloat(document.getElementById("budgetInput").value);
+    if (!val || val <= 0) { showToast("Enter a valid budget.", "error"); return; }
+    saveBudget(val);
+    document.getElementById("budgetPanel").style.display = "block";
+    renderBudget(getExpenses());
+    showToast("🎯 Budget set to " + fmtMoney(val));
+  }
+
+  function renderBudget(exp) {
+    var b = getBudget();
+    if (!b) return;
+    var mt  = monthTotal(exp);
+    var pct = Math.min(mt / b * 100, 100);
+    document.getElementById("budgetFill").style.width = pct + "%";
+    document.getElementById("budgetFill").className   = "budget-fill" + (pct >= 80 ? " warn" : "");
+    document.getElementById("budgetSpent").textContent = "Spent: " + fmtMoney(mt);
+    document.getElementById("budgetMax").textContent   = "Budget: " + fmtMoney(b);
+    var st = document.getElementById("budgetStatus");
+    if (mt > b) {
+      st.innerHTML = '<span style="color:var(--red);font-weight:600;">⚠️ Over budget by ' + fmtMoney(mt-b) + '!</span>';
+    } else {
+      st.textContent = "✅ " + fmtMoney(b-mt) + " remaining";
+      st.style.color = "var(--green)";
+    }
+  }
+
+  function checkBudgetAlert(exp) {
+    var b = getBudget();
+    if (!b) return;
+    var mt = monthTotal(exp);
+    if (mt > b) showToast("🚨 Budget exceeded! Spent " + fmtMoney(mt), "warning");
+  }
+
+  // ── RECENT ────────────────────────────────────
+  function renderRecent(exp) {
+    var el = document.getElementById("recentList");
+    var r  = exp.slice().sort(function(a,b){ return new Date(b.createdAt||b.date)-new Date(a.createdAt||a.date); }).slice(0,5);
+    if (!r.length) { el.innerHTML = '<p class="empty-msg">No transactions yet.</p>'; return; }
+    el.innerHTML = r.map(function(e){
+      return '<div class="recent-item">'+
+        '<div class="recent-emoji">'+catIcon(e.category)+'</div>'+
+        '<div class="recent-meta"><div class="recent-name">'+escHtml(e.name)+'</div><div class="recent-info">'+e.category+' · '+fmtDate(e.date)+'</div></div>'+
+        '<div class="recent-amt">'+fmtMoney(e.amount)+'</div></div>';
+    }).join("");
+  }
+
+  // ── INSIGHTS ──────────────────────────────────
+  function renderInsights(exp) {
+    var el = document.getElementById("insightsList");
+    var items = [];
+    var top = topCategory(exp);
+    if (top) items.push({ icon: catIcon(top[0]), text: "You spend the most on <strong>"+top[0]+"</strong> ("+fmtMoney(top[1])+" total).", type:"" });
+    var tw = weekTotal(exp, 0), lw = weekTotal(exp, 1);
+    if (tw > lw && lw > 0) {
+      var pct = Math.round((tw-lw)/lw*100);
+      items.push({ icon:"📈", text:"Spending <strong>increased "+pct+"%</strong> vs last week.", type:"warn" });
+    } else if (lw > 0 && tw < lw) {
+      items.push({ icon:"📉", text:"Spending is <strong>down this week</strong> vs last week.", type:"good" });
+    }
+    var high = exp.filter(function(e){ return e.amount >= 2000; });
+    if (high.length) items.push({ icon:"🔴", text:"<strong>"+high.length+" high-value expense(s)</strong> above ₹2,000.", type:"warn" });
+    if (!items.length) { el.innerHTML = '<p class="empty-msg">Add expenses to see insights.</p>'; return; }
+    el.innerHTML = items.map(function(i){
+      return '<div class="insight-item '+i.type+'"><span class="insight-icon">'+i.icon+'</span><span>'+i.text+'</span></div>';
+    }).join("");
+  }
+
+  function weekTotal(exp, offset) {
+    var now = new Date(), day = now.getDay();
+    var mon = new Date(now); mon.setDate(now.getDate() + (day===0?-6:1-day) - offset*7); mon.setHours(0,0,0,0);
+    var sun = new Date(mon); sun.setDate(mon.getDate()+6); sun.setHours(23,59,59,999);
+    return exp.filter(function(e){ var d=new Date(e.date+"T00:00:00"); return d>=mon&&d<=sun; }).reduce(function(s,e){ return s+e.amount; },0);
+  }
+
+  // ── TABLE ─────────────────────────────────────
+  function renderTable() {
+    var q  = document.getElementById("search").value.toLowerCase();
+    var fc = document.getElementById("filterCat").value;
+    var so = document.getElementById("sortSel").value;
+    var list = getExpenses().filter(function(e){
+      return (!q || e.name.toLowerCase().includes(q) || e.category.toLowerCase().includes(q)) &&
+             (!fc || e.category === fc);
+    });
+    if (so==="oldest") list.sort(function(a,b){ return new Date(a.date)-new Date(b.date); });
+    else if (so==="newest") list.sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
+    else if (so==="high") list.sort(function(a,b){ return b.amount-a.amount; });
+    else if (so==="low")  list.sort(function(a,b){ return a.amount-b.amount; });
+
+    var tbody = document.getElementById("expBody");
+    var empty = document.getElementById("emptyMsg");
+    if (!list.length) { tbody.innerHTML=""; empty.style.display="block"; return; }
+    empty.style.display = "none";
+    tbody.innerHTML = list.map(function(e,i){
+      var hi = e.amount >= 2000;
+      return '<tr class="'+(hi?"hi-row":"")+'" style="animation-delay:'+i*25+'ms">'+
+        '<td><span class="cat-chip">'+catIcon(e.category)+' '+e.category+'</span></td>'+
+        '<td>'+escHtml(e.name)+'</td>'+
+        '<td class="amt-cell '+(hi?"hi":"")+'">'+fmtMoney(e.amount)+'</td>'+
+        '<td>'+fmtDate(e.date)+'</td>'+
+        '<td><div class="act-btns">'+
+          '<button class="btn btn-secondary btn-xs" onclick="startEdit(\''+e.id+'\')">✏️</button>'+
+          '<button class="btn btn-danger btn-xs" onclick="delExpense(\''+e.id+'\')">🗑️</button>'+
+        '</div></td></tr>';
+    }).join("");
+  }
+
+  // ── SAVE ──────────────────────────────────────
+  function saveExpense() {
+    var id   = document.getElementById("editId").value;
+    var name = document.getElementById("expName").value.trim();
+    var amt  = parseFloat(document.getElementById("expAmt").value);
+    var cat  = document.getElementById("expCat").value;
+    var date = document.getElementById("expDate").value;
+    if (!name) { showToast("Enter a name.", "error"); return; }
+    if (!amt||amt<=0) { showToast("Enter a valid amount.", "error"); return; }
+    if (!date) { showToast("Pick a date.", "error"); return; }
+    var exp = getExpenses();
+    // Duplicate check
+    var dup = exp.some(function(e){ return e.id!==id && e.name.toLowerCase()===name.toLowerCase() && e.amount===amt && e.date===date; });
+    if (dup) { showToast("⚠️ Duplicate expense!", "error"); return; }
+    if (id) {
+      var idx = exp.findIndex(function(e){ return e.id===id; });
+      if (idx!==-1) exp[idx] = Object.assign(exp[idx], {name:name,amount:amt,category:cat,date:date});
+      showToast("✅ Expense updated!"); cancelEdit();
+    } else {
+      exp.unshift({id:uid(),name:name,amount:amt,category:cat,date:date,createdAt:new Date().toISOString()});
+      showToast("✅ Expense added!");
+    }
+    saveExpenses(exp); clearForm(); renderAll();
+    checkBudgetAlert(getExpenses());
+  }
+
+  function clearForm() {
+    document.getElementById("expName").value = "";
+    document.getElementById("expAmt").value  = "";
+    document.getElementById("expDate").valueAsDate = new Date();
+    document.getElementById("expCat").selectedIndex = 0;
+  }
+
+  function startEdit(id) {
+    var e = getExpenses().find(function(x){ return x.id===id; });
+    if (!e) return;
+    document.getElementById("editId").value   = e.id;
+    document.getElementById("expName").value  = e.name;
+    document.getElementById("expAmt").value   = e.amount;
+    document.getElementById("expCat").value   = e.category;
+    document.getElementById("expDate").value  = e.date;
+    document.getElementById("formTitle").textContent = "✏️ Edit Expense";
+    document.getElementById("cancelBtn").style.display = "inline-flex";
+    document.querySelector(".card").scrollIntoView({behavior:"smooth"});
+  }
+
+  function cancelEdit() {
+    document.getElementById("editId").value = "";
+    document.getElementById("formTitle").textContent = "➕ Add Expense";
+    document.getElementById("cancelBtn").style.display = "none";
+    clearForm();
+  }
+
+  function delExpense(id) {
+    var e = getExpenses().find(function(x){ return x.id===id; });
+    if (!e) return;
+    showConfirm("Delete Expense", "Delete \""+e.name+"\" ("+fmtMoney(e.amount)+")? Cannot be undone.", function(){
+      saveExpenses(getExpenses().filter(function(x){ return x.id!==id; }));
+      renderAll(); showToast("🗑️ Deleted.");
+    });
+  }
+
+  function clearAll() {
+    if (!getExpenses().length) { showToast("Nothing to clear.", "warning"); return; }
+    showConfirm("Clear All Expenses", "Delete ALL expenses permanently?", function(){
+      saveExpenses([]); renderAll(); showToast("🗑️ All cleared.");
+    });
+    document.getElementById("confirmYesBtn").textContent = "Clear All";
+  }
+
+  // ── CSV IMPORT ────────────────────────────────
+  function handleCSV(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var lines = e.target.result.split("\n").filter(function(l){ return l.trim(); });
+      if (lines.length < 2) { showToast("CSV is empty.", "error"); return; }
+      var header = lines[0].toLowerCase();
+      if (!header.includes("name") || !header.includes("amount")) {
+        showToast("Invalid CSV. Header must have Name, Amount.", "error"); return;
+      }
+      var exp = getExpenses(), added = 0, skipped = 0;
+      for (var i = 1; i < lines.length; i++) {
+        var cols = lines[i].split(",").map(function(c){ return c.replace(/"/g,"").trim(); });
+        var name = cols[0], amt = parseFloat(cols[1]), cat = cols[2]||"Other", date = cols[3];
+        if (!name||!amt||!date) { skipped++; continue; }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { skipped++; continue; }
+        if (exp.some(function(x){ return x.name.toLowerCase()===name.toLowerCase()&&x.amount===amt&&x.date===date; })) { skipped++; continue; }
+        var validCat = Object.keys(CAT_ICON).includes(cat) ? cat : "Other";
+        exp.push({id:uid(),name:name,amount:amt,category:validCat,date:date,createdAt:new Date().toISOString()});
+        added++;
+      }
+      saveExpenses(exp);
+      showToast("📥 Imported "+added+" expense(s). Skipped "+skipped+".", added>0?"success":"warning");
+      renderAll();
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+  }
+</script>
+</body>
+</html>
